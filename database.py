@@ -5,8 +5,8 @@ import os
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "social_network")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
+DB_USER = os.getenv("DB_USER", "postgres") # В проде поменять на нормального пользователя.
+DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres") # В проде поменять на нормального пользователя.
 
 def get_db_connection():
     conn = psycopg2.connect(
