@@ -2,9 +2,11 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import Optional, Union
-from jose import JWTError
+from jose import jwt, JWTError
+import psycopg2.errors
 from database import get_db_connection
 from auth import get_password_hash, verify_password, create_access_token, SECRET_KEY, ALGORITHM
+
 
 app = FastAPI(title="Social Network Skeleton")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -49,31 +51,30 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 def register_user(user: UserCreate):
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Проверка существования пользователя
-    cursor.execute("SELECT id FROM users WHERE username = %s", (user.username,))
-    if cursor.fetchone():
-        cursor.close()
-        conn.close()
-        raise HTTPException(status_code=400, detail="Username already registered")
-    
+
     hashed_password = get_password_hash(user.password)
-    
+
     # Параметризованный запрос для защиты от SQL-инъекций
     query = """
         INSERT INTO users (username, password_hash, first_name, last_name, birth_date, gender, interests, city)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
     """
-    cursor.execute(query, (
-        user.username, hashed_password, user.first_name, user.last_name,
-        user.birth_date, user.gender, user.interests, user.city
-    ))
-    
-    user_id = cursor.fetchone()['id']
-    conn.commit()
-    cursor.close()
-    conn.close()
-    
+    try:
+        # Рассчитываем на UNIQUE-ограничение БД: если username занят,
+        # вставка атомарно упадёт с UniqueViolation даже при гонке запросов.
+        cursor.execute(query, (
+            user.username, hashed_password, user.first_name, user.last_name,
+            user.birth_date, user.gender, user.interests, user.city
+        ))
+        user_id = cursor.fetchone()['id']
+        conn.commit()
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail="Username already registered")
+    finally:
+        cursor.close()
+        conn.close()
+
     return {"id": user_id, "message": "User created successfully"}
 
 @app.post("/login")
