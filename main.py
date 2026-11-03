@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, Union
 from jose import jwt, JWTError
 import psycopg2.errors
-from database import get_db_connection
+from database import get_db_connection, put_db_connection
 from auth import get_password_hash, verify_password, create_access_token, SECRET_KEY, ALGORITHM
 
 
@@ -73,7 +73,7 @@ def register_user(user: UserCreate):
         raise HTTPException(status_code=400, detail="Username already registered")
     finally:
         cursor.close()
-        conn.close()
+        put_db_connection(conn)
 
     return {"id": user_id, "message": "User created successfully"}
 
@@ -86,7 +86,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     cursor.execute("SELECT id, password_hash FROM users WHERE username = %s", (form_data.username,))
     db_user = cursor.fetchone()
     cursor.close()
-    conn.close()
+    put_db_connection(conn)
     
     if not db_user or not verify_password(form_data.password, db_user['password_hash']):
         raise HTTPException(
@@ -111,7 +111,7 @@ def get_user(user_id: int, current_user: str = Depends(get_current_user)):
     cursor.execute(query, (user_id,))
     user = cursor.fetchone()
     cursor.close()
-    conn.close()
+    put_db_connection(conn)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -121,3 +121,40 @@ def get_user(user_id: int, current_user: str = Depends(get_current_user)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+@app.get("/user/search")
+def search_users(
+    first_name: str,
+    last_name: str,
+    limit: int = 20,
+    current_user: str = Depends(get_current_user),
+):
+    """Поиск анкет по префиксу имени И фамилии одновременно.
+
+    Запрос вида: first_name LIKE 'Во%' AND last_name LIKE 'См%' ORDER BY id.
+    Параметризация (%s) — подстановочные знаки (%) добавляются на стороне
+    приложения, сам пользовательский ввод в SQL не попадает.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = """
+        SELECT id, first_name, last_name, birth_date::text, gender, interests, city
+        FROM users
+        WHERE first_name LIKE %s AND last_name LIKE %s
+        ORDER BY id
+        LIMIT %s
+    """
+    cursor.execute(query, (first_name + "%", last_name + "%", limit))
+    rows = cursor.fetchall()
+    cursor.close()
+    put_db_connection(conn)
+
+    return [
+        UserResponse(
+            id=r['id'], first_name=r['first_name'], last_name=r['last_name'],
+            birth_date=r['birth_date'], gender=r['gender'],
+            interests=r['interests'], city=r['city'],
+        ) for r in rows
+    ]

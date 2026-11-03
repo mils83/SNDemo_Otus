@@ -1,0 +1,31 @@
+--- [before] first LIKE 'Ан%' AND last LIKE 'Ив%' (common) ---
+Limit  (cost=0.42..227.94 rows=20 width=103) (actual time=0.085..0.477 rows=20.00 loops=1)
+  Buffers: shared hit=127
+  ->  Index Scan using users_pkey on users  (cost=0.42..50065.86 rows=4401 width=103) (actual time=0.084..0.475 rows=20.00 loops=1)
+        Filter: (((first_name)::text ~~ 'Ан%'::text) AND ((last_name)::text ~~ 'Ив%'::text))
+        Rows Removed by Filter: 5317
+        Index Searches: 1
+        Buffers: shared hit=127
+Planning:
+  Buffers: shared hit=135 read=1
+Planning Time: 0.237 ms
+Execution Time: 0.489 ms
+
+--- [before] first LIKE 'Ы%' AND last LIKE 'Ъ%' (worst_case) ---
+Limit  (cost=26310.11..26310.12 rows=1 width=103) (actual time=18.471..20.036 rows=0.00 loops=1)
+  Buffers: shared hit=11325 read=7738
+  ->  Sort  (cost=26310.11..26310.12 rows=1 width=103) (actual time=18.470..20.034 rows=0.00 loops=1)
+        Sort Key: id
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=11325 read=7738
+        ->  Gather  (cost=1000.00..26310.10 rows=1 width=103) (actual time=18.453..20.017 rows=0.00 loops=1)
+              Workers Planned: 2
+              Workers Launched: 2
+              Buffers: shared hit=11322 read=7738
+              ->  Parallel Seq Scan on users  (cost=0.00..25310.01 rows=1 width=103) (actual time=17.096..17.096 rows=0.00 loops=3)
+                    Filter: (((first_name)::text ~~ 'Ы%'::text) AND ((last_name)::text ~~ 'Ъ%'::text))
+                    Rows Removed by Filter: 333334
+                    Buffers: shared hit=11322 read=7738
+Planning Time: 0.052 ms
+Execution Time: 20.050 ms
+

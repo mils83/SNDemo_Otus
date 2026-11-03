@@ -1,0 +1,30 @@
+--- [after] first LIKE 'Ан%' AND last LIKE 'Ив%' (common) ---
+Limit  (cost=0.42..250.62 rows=20 width=103) (actual time=0.081..0.463 rows=20.00 loops=1)
+  Buffers: shared hit=127
+  ->  Index Scan using users_pkey on users  (cost=0.42..50063.93 rows=4002 width=103) (actual time=0.080..0.461 rows=20.00 loops=1)
+        Filter: (((first_name)::text ~~ 'Ан%'::text) AND ((last_name)::text ~~ 'Ив%'::text))
+        Rows Removed by Filter: 5317
+        Index Searches: 1
+        Buffers: shared hit=127
+Planning:
+  Buffers: shared hit=205 read=3
+Planning Time: 0.414 ms
+Execution Time: 0.476 ms
+
+--- [after] first LIKE 'Ы%' AND last LIKE 'Ъ%' (worst_case) ---
+Limit  (cost=8.47..8.48 rows=1 width=103) (actual time=0.043..0.043 rows=0.00 loops=1)
+  Buffers: shared hit=8
+  ->  Sort  (cost=8.47..8.48 rows=1 width=103) (actual time=0.042..0.042 rows=0.00 loops=1)
+        Sort Key: id
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=8
+        ->  Index Scan using idx_users_first_name_last_name_pattern on users  (cost=0.42..8.46 rows=1 width=103) (actual time=0.032..0.032 rows=0.00 loops=1)
+              Index Cond: (((first_name)::text ~>=~ 'Ы'::text) AND ((first_name)::text ~<~ 'Ь'::text) AND ((last_name)::text ~>=~ 'Ъ'::text) AND ((last_name)::text ~<~ 'Ы'::text))
+              Filter: (((first_name)::text ~~ 'Ы%'::text) AND ((last_name)::text ~~ 'Ъ%'::text))
+              Index Searches: 1
+              Buffers: shared hit=5
+Planning:
+  Buffers: shared hit=14
+Planning Time: 0.127 ms
+Execution Time: 0.053 ms
+
